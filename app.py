@@ -389,7 +389,7 @@ def drop_piece(a,p):
             return False
             
     print(f"Column {p} full, try again")
-    return drop_piece(a)
+    return False
 
 def check_win(col, row, player):
     directions = [
@@ -463,7 +463,7 @@ def ai_move(player):
     for row in range(y-1, -1, -1):
         if game[row][best_col] == 0:
             game[row][best_col] = player
-            return check_win(best_col, row, player)
+            return best_col
 
 def play_game_ai():
     current_player = 1  # Human starts
@@ -505,6 +505,7 @@ def reset_game():
 board = Connect4()
 count = 42
 difficulty = "Hard"
+current_player = 1 
 
 @app.route('/')
 def home():
@@ -519,6 +520,7 @@ def move(data):
         socketio.emit("allow",{})
     else:
         global count,difficulty
+        drop_piece(current_player,col+1)
         count-=1
         socketio.emit("debug",{"debug": "Okay!!"})
         temp = board.board.winloss(col)
@@ -543,7 +545,7 @@ def move(data):
             else:
                 val,index = board.next_move_alpha_beta(False,0,3,p=True)
         else:
-            pass
+            index = ai_move(current_player)
         board.board.insert(index,"O")
         count-=1
         move = index
@@ -567,6 +569,7 @@ def reset1():
     print("Board Resetted...................")
     global count
     count = 42
+    reset_game()
     return redirect('/')
 
 @app.route('/easy',methods=["GET","POST"])
