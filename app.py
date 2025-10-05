@@ -273,23 +273,8 @@ class Connect4:
 
 #### Start of CNN
 
-# Extract weights layer by layer
-weights_dict = {}
-for layer in model.layers:
-    params = layer.get_weights()
-    if len(params) == 1:
-        weights_dict[f"{layer.name}_weights"] = params[0]
-    elif len(params) == 2:
-        weights_dict[f"{layer.name}_weights"] = params[0]
-        weights_dict[f"{layer.name}_bias"] = params[1]
-# Layers like Dropout, BatchNorm, Activation may or may not have weights
-
-# Save weights to .npz
-np.savez("cnn_weights.npz", **weights_dict)
-print(f"✅ Saved {len(weights_dict)} arrays to cnn_weights.npz")
-
 # Load weights for NumPy forward pass
-weights_data = np.load("cnn_weights.npz", allow_pickle=True)
+weights_data = np.load("/home/sachcith/Documents/Github/Connect-4_Game/cnn_weights.npz", allow_pickle=True)
 weights = {
     "conv1_w": weights_data[weights_data.files[0]],       # conv2d
     "conv1_b": weights_data[weights_data.files[1]],
@@ -519,8 +504,9 @@ def move(data):
         socketio.emit("debug",{"debug": "Column Already Full!!"})
         socketio.emit("allow",{})
     else:
-        global count,difficulty
+        global count,difficulty,current_player
         drop_piece(current_player,col+1)
+        current_player = 2 if current_player == 1 else 1
         count-=1
         socketio.emit("debug",{"debug": "Okay!!"})
         temp = board.board.winloss(col)
@@ -545,7 +531,11 @@ def move(data):
             else:
                 val,index = board.next_move_alpha_beta(False,0,3,p=True)
         else:
+            if temp[4]>0:
+                socketio.emit("winloss",{"output":"🔴 Won"})
+                return
             index = ai_move(current_player)
+            current_player = 2 if current_player == 1 else 1
         board.board.insert(index,"O")
         count-=1
         move = index
