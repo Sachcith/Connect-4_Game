@@ -45,6 +45,9 @@
 </style>
 
 <body>
+    <center>
+        <h1>Connect 4 Game!!</h1>
+    </center>
     <div class="board">
         <table id="table">
             {% for i in range(6) %}
@@ -67,6 +70,13 @@
         <center>
             <h3 id="output">Debug Statements Appear Here</h3>
             <a href="/resetThing"><button>Reset</button></a>
+            <table>
+                <tr>
+                    <td style="border:none;"><a href="/easy"><button>Easy</button></a></td>
+                    <td style="border:none;"><a href="/medium"><button>Medium</button></a></td>
+                    <td style="border:none;"><a href="/hard"><button>Hard</button></a></td>
+                </tr>
+            </table>
         </center>
     </div>
 </body>

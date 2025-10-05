@@ -1,5 +1,6 @@
 from flask import Flask,render_template,redirect
 from flask_socketio import SocketIO
+import numpy as np
 
 app = Flask(__name__)
 socketio = SocketIO(app)
@@ -270,8 +271,240 @@ class Connect4:
             print("Draw......Noice")
         print("Game Ended!!!")
 
+#### Start of CNN
+
+# Extract weights layer by layer
+weights_dict = {}
+for layer in model.layers:
+    params = layer.get_weights()
+    if len(params) == 1:
+        weights_dict[f"{layer.name}_weights"] = params[0]
+    elif len(params) == 2:
+        weights_dict[f"{layer.name}_weights"] = params[0]
+        weights_dict[f"{layer.name}_bias"] = params[1]
+# Layers like Dropout, BatchNorm, Activation may or may not have weights
+
+# Save weights to .npz
+np.savez("cnn_weights.npz", **weights_dict)
+print(f"✅ Saved {len(weights_dict)} arrays to cnn_weights.npz")
+
+# Load weights for NumPy forward pass
+weights_data = np.load("cnn_weights.npz", allow_pickle=True)
+weights = {
+    "conv1_w": weights_data[weights_data.files[0]],       # conv2d
+    "conv1_b": weights_data[weights_data.files[1]],
+    "conv2_w": weights_data[weights_data.files[2]],     # conv2d_1
+    "conv2_b": weights_data[weights_data.files[3]],
+    "dense1_w": weights_data[weights_data.files[4]],       # dense
+    "dense1_b": weights_data[weights_data.files[5]],
+    "dense2_w": weights_data[weights_data.files[6]],     # dense_1
+    "dense2_b": weights_data[weights_data.files[7]],
+    "dense3_w": weights_data[weights_data.files[8]],     # dense_2
+    "dense3_b": weights_data[weights_data.files[9]]
+}
+
+# --- NumPy forward pass functions ---
+def relu(x):
+    return np.maximum(0, x)
+
+def softmax(x):
+    e = np.exp(x - np.max(x))
+    return e / np.sum(e, axis=-1, keepdims=True)
+
+def conv2d_numpy(x, weight, bias, stride=1, padding='same'):
+    # x: (H,W,C_in), weight: (kH,kW,C_in,C_out), bias: (C_out,)
+    H, W, C_in = x.shape
+    kH, kW, _, C_out = weight.shape
+    if padding == 'same':
+        pad_h = (kH - 1) // 2
+        pad_w = (kW - 1) // 2
+        x_padded = np.pad(x, ((pad_h,pad_h),(pad_w,pad_w),(0,0)), mode='constant')
+    else:
+        x_padded = x
+    H_out = (x_padded.shape[0] - kH)//stride + 1
+    W_out = (x_padded.shape[1] - kW)//stride + 1
+    out = np.zeros((H_out, W_out, C_out))
+    for i in range(H_out):
+        for j in range(W_out):
+            for c in range(C_out):
+                region = x_padded[i:i+kH, j:j+kW, :]
+                out[i,j,c] = np.sum(region * weight[:,:,:,c]) + bias[c]
+    return out
+
+def maxpool2d_numpy(x, pool_size=2, stride=2):
+    H, W, C = x.shape
+    H_out = (H - pool_size)//stride + 1
+    W_out = (W - pool_size)//stride + 1
+    out = np.zeros((H_out, W_out, C))
+    for i in range(H_out):
+        for j in range(W_out):
+            region = x[i*stride:i*stride+pool_size, j*stride:j*stride+pool_size, :]
+            out[i,j,:] = np.max(region, axis=(0,1))
+    return out
+
+def forward_pass(board, weights):
+    x = board.astype(np.float32)  # (6,7,1)
+
+    # Conv1 + ReLU + MaxPool
+    out1 = conv2d_numpy(x, weights['conv1_w'], weights['conv1_b'])
+    out1 = relu(out1)
+    out1_pool = maxpool2d_numpy(out1, pool_size=2, stride=2)  # (3,3,64)
+
+    # Conv2 + ReLU + MaxPool
+    out2 = conv2d_numpy(out1_pool, weights['conv2_w'], weights['conv2_b'])
+    out2 = relu(out2)
+    out2_pool = maxpool2d_numpy(out2, pool_size=2, stride=2)  # (1,1,128)
+
+    # Flatten
+    flat = out2_pool.flatten().reshape(1, -1)  # (1,128)
+
+    # Dense layers
+    dense1 = relu(flat @ weights['dense1_w'] + weights['dense1_b'])  # (1,256)
+    dense2 = relu(dense1 @ weights['dense2_w'] + weights['dense2_b'])  # (1,128)
+    logits = dense2 @ weights['dense3_w'] + weights['dense3_b']  # (1,3)
+    
+    probs = softmax(logits)
+    return probs[0]
+
+x=7
+y=6
+
+game = [[0 for i in range(x)]for i in range(y)]
+
+def printgame():
+    for i in game:
+        for j in i:
+            print(j,end="  ")
+        print()
+
+def drop_piece(a,p):
+    for i in range(y):
+        if game[y-i-1][p-1]==0 :
+            game[y-i-1][p-1] = a
+        
+            if check_win(p-1, y-i-1, a):
+                print(f"Player {a} wins!")
+                return True
+                
+            return False
+            
+    print(f"Column {p} full, try again")
+    return drop_piece(a)
+
+def check_win(col, row, player):
+    directions = [
+        (0, 1),
+        (1, 0),
+        (1, 1),
+        (1, -1)
+    ]
+    for dr, dc in directions:
+        count = 1
+        r, c = row + dr, col + dc
+        while 0 <= r < y and 0 <= c < x and game[r][c] == player:
+            count += 1
+            r += dr
+            c += dc
+        r, c = row - dr, col - dc
+        while 0 <= r < y and 0 <= c < x and game[r][c] == player:
+            count += 1
+            r -= dr
+            c -= dc
+        if count >= 4:
+            return True
+            
+    return False
+    
+def is_board_full():
+    return all(game[0][col] != 0 for col in range(x))
+
+def play_game():
+    current_player = 1
+    print("Connect 4 Game!")
+    print("Players are 1 and 2")
+    printgame()
+    
+    while True:
+        print(f"\nPlayer {current_player}'s turn:")
+        
+        if drop_piece(current_player):
+            printgame()
+            break
+            
+        if is_board_full():
+            print("Board is full! It's a tie!")
+            printgame()
+            break
+            
+        printgame()
+        current_player = 2 if current_player == 1 else 1
+
+def ai_move(player):
+    best_score = -1
+    best_col = None
+    for col in range(x):
+        # Check if column is valid
+        if game[0][col] != 0:
+            continue
+        # Copy board and simulate move
+        temp_board = [row.copy() for row in game]
+        for row in range(y-1, -1, -1):
+            if temp_board[row][col] == 0:
+                temp_board[row][col] = player
+                break
+        # Convert to numpy array and reshape for CNN
+        input_board = np.array(temp_board).reshape(6,7,1)
+        pred = forward_pass(input_board,weights)
+        win_prob = pred[2]  # probability of "win"
+        if win_prob > best_score:
+            best_score = win_prob
+            best_col = col
+    # Drop piece in best column
+    for row in range(y-1, -1, -1):
+        if game[row][best_col] == 0:
+            game[row][best_col] = player
+            return check_win(best_col, row, player)
+
+def play_game_ai():
+    current_player = 1  # Human starts
+    print("Connect 4 Game!")
+    print("Player 1 = Human, Player 2 = AI")
+    printgame()
+    
+    while True:
+        print(f"\nPlayer {current_player}'s turn:")
+        
+        if current_player == 1:
+            if drop_piece(current_player):  # Human move
+                printgame()
+                print("Human wins!")
+                break
+        else:
+            if ai_move(current_player):  # AI move ------------------------------
+                printgame()
+                print("AI wins!")
+                break
+                
+        if is_board_full():
+            print("Board is full! It's a tie!")
+            printgame()
+            break
+        
+        printgame()
+        current_player = 2 if current_player == 1 else 1
+
+def reset_game():
+    global game
+    game = [[0 for _ in range(x)] for _ in range(y)]
+
+#### End of CNN
+
+
+
+
 board = Connect4()
 count = 42
+difficulty = "Hard"
 
 @app.route('/')
 def home():
@@ -285,19 +518,32 @@ def move(data):
         socketio.emit("debug",{"debug": "Column Already Full!!"})
         socketio.emit("allow",{})
     else:
-        global count
+        global count,difficulty
         count-=1
         socketio.emit("debug",{"debug": "Okay!!"})
         temp = board.board.winloss(col)
         socketio.emit("player",{"cell":col+7*(6-board.board.valid[col])})
-        if temp[4]>0:
-            socketio.emit("winloss",{"output":"🔴 Won"})
-            return
         val,index=0,0
-        if count<17:
-            val,index = board.next_move_alpha_beta(False,0,max(count,2),p=True)
+        if difficulty=="hard":
+            if temp[4]>0:
+                socketio.emit("winloss",{"output":"🔴 Won"})
+                return
+            val,index=0,0
+            if count<17:
+                val,index = board.next_move_alpha_beta(False,0,max(count,2),p=True)
+            else:
+                val,index = board.next_move_alpha_beta(False,0,6,p=True)
+        elif difficulty=="medium":
+            if temp[4]>0:
+                socketio.emit("winloss",{"output":"🔴 Won"})
+                return
+            val,index=0,0
+            if count<5:
+                val,index = board.next_move_alpha_beta(False,0,max(count,2),p=True)
+            else:
+                val,index = board.next_move_alpha_beta(False,0,3,p=True)
         else:
-            val,index = board.next_move_alpha_beta(False,0,6,p=True)
+            pass
         board.board.insert(index,"O")
         count-=1
         move = index
@@ -322,6 +568,30 @@ def reset1():
     global count
     count = 42
     return redirect('/')
+
+@app.route('/easy',methods=["GET","POST"])
+def easy():
+    global difficulty
+    difficulty = "easy"
+    print(difficulty)
+    return reset1()
+
+@app.route('/hard',methods=["GET","POST"])
+def hard():
+    global difficulty
+    difficulty = "hard"
+    print(difficulty)
+    return reset1()
+
+@app.route('/medium',methods=["GET","POST"])
+def medium():
+    global difficulty
+    difficulty = "medium"
+    print(difficulty)
+    return reset1()
+
+
+
 
 '''
 @socketio.on("reset")
