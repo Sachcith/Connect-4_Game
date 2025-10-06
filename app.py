@@ -274,7 +274,7 @@ class Connect4:
 #### Start of CNN
 
 # Load weights for NumPy forward pass
-weights_data = np.load("/home/sachcith/Documents/Github/Connect-4_Game/cnn_weights.npz", allow_pickle=True)
+weights_data = np.load("cnn_weights.npz", allow_pickle=True)
 weights = {
     "conv1_w": weights_data[weights_data.files[0]],       # conv2d
     "conv1_b": weights_data[weights_data.files[1]],
@@ -491,7 +491,7 @@ board = Connect4()
 count = 42
 difficulty = "Hard"
 current_player = 1
-message = "Debug Statements Appear Here"
+message = "Click to Start"
 
 @app.route('/')
 def home():
@@ -571,7 +571,8 @@ def reset1():
     board.board.reset()
     print("Board Resetted...................")
     global count,message
-    message = "Debug Statements Appear Here"
+    #message = "Debug Statements Appear Here"
+    message = "Click to Start"
     count = 42
     reset_game()
     return redirect('/')

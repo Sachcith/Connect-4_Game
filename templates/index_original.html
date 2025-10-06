@@ -10,7 +10,6 @@
 
 <style>
     body {
-        background: radial-gradient(circle at top, #7ec9ff 0%, #0072b1 100%);
         margin: 0;                     
         height: 100vh;                 
         display: flex;                 
@@ -19,7 +18,6 @@
         align-items: center;            
     }
     .board {
-        background-color: lightgrey;
         border: 2px solid black;
         border-radius: 8%;
         padding: 0.5%;
@@ -27,11 +25,6 @@
         align-items: center;
         justify-content: center;
         margin-bottom: 20px;
-        position: relative;
-        overflow: hidden;
-    }
-    table {
-        position: relative;
     }
     td {
         padding: 15px 20px;
@@ -39,44 +32,7 @@
         border-radius: 100%;
         color: transparent;
         cursor: pointer;
-        position: relative;
-        transition: all 0.2s ease;
     }
-    
-    td:hover {
-        transform: scale(1.05);
-        box-shadow: 0 0 10px rgba(0,0,0,0.3);
-    }
-
-    @keyframes fallthing {
-        from {
-            transform: translateY(-500px);
-            opacity: 0;
-        }
-        to {
-            transform: translateY(0);
-            opacity: 1;
-        }
-    }
-    
-    .fallingthing {
-        animation: fallthing 0.5s cubic-bezier(0.5, 0, 0.75, 0) forwards;
-    }
-    
-
-    @keyframes bouncething {
-        0%, 100% {
-            transform: scale(1);
-        }
-        50% {
-            transform: scale(1.1);
-        }
-    }
-
-    .bouncething {
-        animation: bouncething 0.3s ease-out;
-    }
-    
     .debug {
         text-align: center;
     }
@@ -85,37 +41,13 @@
         color: black;
         border: 2px solid black;
         border-radius: 3px;
-        font-size: larger;
-        cursor: pointer;
-        margin: 5px;
-        transition: all 0.2s ease;
-    }
-    
-    button:hover {
-        transform: scale(1.05);
-        box-shadow: 0 4px 8px rgba(0,0,0,0.2);
-    }
-    
-    button:active {
-        transform: scale(0.98);
-    }
-    
-    /* Active/Selected difficulty button style */
-    .difficulty-active {
-        border: 4px solid #2c3e50 !important;
-        box-shadow: 0 0 15px rgba(0,0,0,0.4) !important;
-        transform: scale(1.08) !important;
-        font-weight: bold;
-    }
-    
-    .difficulty-active::before {
-        content: "✓ ";
-        font-size: 1.2em;
     }
 </style>
 
 <body>
-    <h1 style = "font-size: 5em; text-align: center;margin-bottom: 120px;">Connect 4 Game</h1>
+    <center>
+        <h1>Connect 4 Game!!</h1>
+    </center>
     <div class="board">
         <table id="table">
             {% for i in range(6) %}
@@ -137,14 +69,12 @@
     <div class="Output">
         <center>
             <h3 id="output">{{ message }}</h3>
+            <a href="/resetThing"><button>Reset</button></a>
             <table>
                 <tr>
-                    <td style="border:none;"><a href="/easy"><button id="easy-btn" style="background-color: lightgrey;">Easy</button></a></td>
-                    <td style="border:none;"><a href="/medium"><button id="medium-btn" style="background-color: lightgray;">Medium</button></a></td>
-                    <td style="border:none;"><a href="/hard"><button id="hard-btn" style="background-color: lightgray;">Hard</button></a></td>
-                </tr>
-                <tr>
-                    <td style="border:none; text-align: center;" colspan="3"><a href="/resetThing"><button style="background-color: lightgray;">Reset</button></a></td>
+                    <td style="border:none;"><a href="/easy"><button>Easy</button></a></td>
+                    <td style="border:none;"><a href="/medium"><button>Medium</button></a></td>
+                    <td style="border:none;"><a href="/hard"><button>Hard</button></a></td>
                 </tr>
             </table>
         </center>
@@ -155,23 +85,6 @@
     const socket = io();
     let board = document.getElementById("table");
     let click = true;
-    
-    function animatePiece(cell, color) {
-        cell.classList.remove('fallingthing', 'bouncething');
-        void cell.offsetWidth;
-        cell.classList.add('fallingthing');
-        cell.style.backgroundColor = color;
-
-        setTimeout(() => {
-            cell.classList.remove('fallingthing');
-            cell.classList.add('bouncething');
-
-            setTimeout(() => {
-                cell.classList.remove('bouncething');
-            }, 300);
-        }, 500);
-    }
-    
     board.addEventListener("click",(e)=>{
         if(!click) return;
         if(e.target.tagName !== "TD") return;
@@ -189,13 +102,13 @@
     socket.on("player", (data)=>{
         let cell = document.querySelector("td[data-val='"+data.cell+"']");
         console.log("Coloring Cell: "+data.cell);
-        animatePiece(cell, "red");
+        cell.style.backgroundColor = "red"; 
     });
 
     socket.on("ai",(data)=>{
         let cell = document.querySelector("td[data-val="+"'"+data.cell+"'"+"]");
         console.log("Coloring Cell: "+data.cell);
-        animatePiece(cell, "yellowgreen");
+        cell.style.backgroundColor = "yellowgreen";
     });
 
     socket.on("winloss",(data)=>{
