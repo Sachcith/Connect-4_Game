@@ -490,31 +490,38 @@ def reset_game():
 board = Connect4()
 count = 42
 difficulty = "Hard"
-current_player = 1 
+current_player = 1
+message = "Debug Statements Appear Here"
 
 @app.route('/')
 def home():
-    return render_template('index.html',board=board.board.board)
+    global message
+    socketio.emit("debug",{"debug": message})
+    return render_template('index.html',board=board.board.board,message=message)
 
 @socketio.on("move")
 def move(data):
+    global message
     col = int(data["col"])
     print(f"Column Clicked: {col}")
     if board.board.insert(col,"X")==False:
         socketio.emit("debug",{"debug": "Column Already Full!!"})
+        message = "Column Already Full!!"
         socketio.emit("allow",{})
     else:
         global count,difficulty,current_player
         drop_piece(current_player,col+1)
         current_player = 2 if current_player == 1 else 1
         count-=1
-        socketio.emit("debug",{"debug": "Okay!!"})
+        socketio.emit("debug",{"debug": "🟢 Ai is playing, please wait!!"})
+        message = "🟢 Ai is playing, please wait!!"
         temp = board.board.winloss(col)
         socketio.emit("player",{"cell":col+7*(6-board.board.valid[col])})
         val,index=0,0
         if difficulty=="hard":
             if temp[4]>0:
                 socketio.emit("winloss",{"output":"🔴 Won"})
+                message = "🔴 Won"
                 return
             val,index=0,0
             if count<17:
@@ -524,6 +531,7 @@ def move(data):
         elif difficulty=="medium":
             if temp[4]>0:
                 socketio.emit("winloss",{"output":"🔴 Won"})
+                message = "🔴 Won"
                 return
             val,index=0,0
             if count<5:
@@ -533,6 +541,7 @@ def move(data):
         else:
             if temp[4]>0:
                 socketio.emit("winloss",{"output":"🔴 Won"})
+                message = "🔴 Won"
                 return
             index = ai_move(current_player)
             current_player = 2 if current_player == 1 else 1
@@ -544,12 +553,16 @@ def move(data):
         temp = board.board.winloss(move)
         if temp[4]>0:
             socketio.emit("winloss",{"output":"🟢 Won"})
+            message = "🟢 Won"
             return
         print(f"Count: {count}")
         if count==0:
             print("It is a Draw")
             socketio.emit("winloss",{"output":"Draw!!"})
+            message = "It is a Draw"
             return
+        socketio.emit("winloss",{"output":"🔴 Player can play now!!"})
+        message = "🔴 Player can play now!!"
         socketio.emit("allow",{})
 
 @app.route('/resetThing',methods=["GET","POST"])
@@ -557,7 +570,8 @@ def reset1():
     print("Inside reset")
     board.board.reset()
     print("Board Resetted...................")
-    global count
+    global count,message
+    message = "Debug Statements Appear Here"
     count = 42
     reset_game()
     return redirect('/')
